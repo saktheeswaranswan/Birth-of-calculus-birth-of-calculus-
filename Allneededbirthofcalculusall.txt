@@ -1,0 +1,1034 @@
+/*
+================================================================
+ THE CALCULUS & APPLIED MATHEMATICS PARADOX SUITE
+ 5-STAGE INTERACTIVE VISUALIZER
+ APDE / PROCESSING FOR ANDROID
+ 
+ STAGE 1: LIMITS (Zeno's Achilles & The Tortoise)
+ STAGE 2: DERIVATIVES (Instantaneous Velocity & Tangents)
+ STAGE 3: INTEGRALS (Riemann Sum Convergence)
+ STAGE 4: DIFFERENTIAL EQUATIONS (Harmonic Oscillator)
+ STAGE 5: PDEs & APPLIED MATH (Fluid Flow / D'Alembert)
+================================================================
+*/
+
+// ================================================================
+// GLOBAL APP STATE & SCENE ROUTING
+// ================================================================
+int activeScene = 0; // 0 = Menu, 1-5 = Mathematics Stages
+
+Scene1_Achilles scene1;
+Scene2_Derivatives scene2;
+Scene3_Integrals scene3;
+Scene4_DiffEq scene4;
+Scene5_Fluids scene5;
+
+// ================================================================
+// GLOBAL UI COLORS (SHARED W/ DARK THEME)
+// ================================================================
+int C_BACKGROUND, C_DEEP_BG, C_AXIS, C_GRID, C_TEXT;
+int C_PANEL, C_PASSED, C_REMAIN, C_CURRENT, C_DESTINATION;
+int C_ACHILLES, C_TORTOISE, C_STAGE;
+
+// ================================================================
+// SETUP
+// ================================================================
+void setup() {
+  fullScreen();
+  orientation(LANDSCAPE);
+  
+  C_BACKGROUND  = color(7, 11, 20);
+  C_DEEP_BG     = color(4, 8, 15);
+  C_AXIS        = color(235, 235, 235);
+  C_GRID        = color(75, 90, 115);
+  C_TEXT        = color(245, 245, 245);
+  C_PANEL       = color(18, 26, 42);
+  C_PASSED      = color(55, 220, 145);
+  C_REMAIN      = color(75, 190, 255);
+  C_CURRENT     = color(255, 185, 45);
+  C_DESTINATION = color(255, 185, 45);
+  
+  // Now Globally Accessible to all Scenes
+  C_ACHILLES    = color(255, 70, 70);
+  C_TORTOISE    = color(80, 210, 120);
+  C_STAGE       = color(255, 185, 45);
+
+  textAlign(CENTER, CENTER);
+  textFont(createFont("Sans", 22));
+  frameRate(60);
+  
+  // Initialize Scenes
+  scene1 = new Scene1_Achilles();
+  scene2 = new Scene2_Derivatives();
+  scene3 = new Scene3_Integrals();
+  scene4 = new Scene4_DiffEq();
+  scene5 = new Scene5_Fluids();
+}
+
+// ================================================================
+// MAIN DRAW LOOP
+// ================================================================
+void draw() {
+  if (activeScene == 0) {
+    drawMenu();
+  } else if (activeScene == 1) {
+    scene1.render();
+    drawBackButton();
+  } else if (activeScene == 2) {
+    scene2.render();
+    drawBackButton();
+  } else if (activeScene == 3) {
+    scene3.render();
+    drawBackButton();
+  } else if (activeScene == 4) {
+    scene4.render();
+    drawBackButton();
+  } else if (activeScene == 5) {
+    scene5.render();
+    drawBackButton();
+  }
+}
+
+// ================================================================
+// MAIN TOUCH ROUTER
+// ================================================================
+void mousePressed() {
+  if (activeScene == 0) {
+    handleMenuTouch();
+  } else {
+    // Back Button Intercept
+    if (mouseX > 20 && mouseX < 160 && mouseY > 20 && mouseY < 70) {
+      activeScene = 0;
+      return;
+    }
+    
+    // Route to active scene
+    if (activeScene == 1) scene1.handleTouch();
+    else if (activeScene == 2) scene2.handleTouch();
+    else if (activeScene == 3) scene3.handleTouch();
+    else if (activeScene == 4) scene4.handleTouch();
+    else if (activeScene == 5) scene5.handleTouch();
+  }
+}
+
+// ================================================================
+// MAIN MENU GUI
+// ================================================================
+void drawMenu() {
+  background(C_BACKGROUND);
+  
+  fill(C_TEXT);
+  textSize(min(40, width * 0.04));
+  text("APPLIED MATHEMATICS & CALCULUS ENGINE", width/2, height * 0.15);
+  
+  fill(C_REMAIN);
+  textSize(20);
+  text("Select a conceptual stage to initialize the visualizer", width/2, height * 0.22);
+  
+  float btnW = width * 0.4;
+  float btnH = height * 0.1;
+  float startY = height * 0.35;
+  float gap = height * 0.12;
+  float centerX = width / 2;
+  
+  String[] labels = {
+    "1. LIMITS: Zeno's Achilles & Tortoise",
+    "2. DERIVATIVES: Velocity & Tangent Lines",
+    "3. INTEGRALS: Riemann Sum Convergence",
+    "4. DIFF EQ: Spring-Mass Oscillation",
+    "5. PDEs: Fluid Flow & D'Alembert's Paradox"
+  };
+  
+  rectMode(CENTER);
+  for (int i = 0; i < 5; i++) {
+    float y = startY + (i * gap);
+    
+    fill(C_PANEL);
+    stroke(C_GRID);
+    strokeWeight(2);
+    rect(centerX, y, btnW, btnH, 15);
+    
+    fill(C_TEXT);
+    textSize(18);
+    text(labels[i], centerX, y);
+  }
+  rectMode(CORNER);
+}
+
+void handleMenuTouch() {
+  float btnW = width * 0.4;
+  float btnH = height * 0.1;
+  float startY = height * 0.35;
+  float gap = height * 0.12;
+  float centerX = width / 2;
+  
+  for (int i = 0; i < 5; i++) {
+    float y = startY + (i * gap);
+    if (mouseX > centerX - btnW/2 && mouseX < centerX + btnW/2 && 
+        mouseY > y - btnH/2 && mouseY < y + btnH/2) {
+      activeScene = i + 1;
+      
+      // Reset specific scenes on load
+      if (activeScene == 1) scene1.reset();
+      if (activeScene == 2) scene2.reset();
+      if (activeScene == 3) scene3.reset();
+      if (activeScene == 4) scene4.reset();
+      if (activeScene == 5) scene5.reset();
+    }
+  }
+}
+
+void drawBackButton() {
+  fill(C_PANEL);
+  stroke(C_GRID);
+  strokeWeight(2);
+  rect(20, 20, 140, 50, 10);
+  fill(C_TEXT);
+  textSize(18);
+  textAlign(CENTER, CENTER);
+  text("🔙 MENU", 90, 45);
+}
+
+
+/*
+================================================================
+ SCENE 1: ZENO'S PARADOX — ACHILLES AND THE TORTOISE
+================================================================
+*/
+class Scene1_Achilles {
+  float lineLeft, lineRight, lineY;
+  
+  String EMOJI_ACHILLES = "🏃";
+  String EMOJI_TORTOISE = "🐢";
+  String EMOJI_TARGET = "🎯";
+  String EMOJI_ARROW = "➡️";
+  String EMOJI_STAGE = "📍";
+  String EMOJI_GAP = "📏";
+  String EMOJI_RESET = "🔄";
+  String EMOJI_NEXT = "📍";
+  String EMOJI_PLAY = "▶️";
+  String EMOJI_STOP = "⏹️";
+  String EMOJI_DYNAMIC = "🔍";
+  String EMOJI_STATIC = "🔭";
+  String EMOJI_TAP = "👆";
+
+  double currentRem = 1.0;
+  double targetRem = 0.5;
+  double animStartRem = 1.0;
+  double animEndRem = 0.5;
+  int stage = 1;
+  final int MAX_STAGE = 122;
+
+  boolean moving = false;
+  boolean autoPlay = false;
+  boolean deepZoomMode = true;
+  double dynamicZoomFactor = 1.0;
+  int animationFrame = 0;
+  final int ANIMATION_FRAMES = 25;
+  float flashAlpha = 0;
+  double currentZoom = 1.0;
+
+  Scene1_Achilles() {}
+
+  void render() {
+    updateScreenGeometry();
+    updateAnimation();
+    updateCamera();
+
+    if (deepZoomMode) background(C_DEEP_BG);
+    else background(C_BACKGROUND);
+
+    drawHeader();
+    drawInformation();
+    drawNumberLine();
+    drawZenoLines();
+    drawRacePositions();
+    drawFlash();
+    drawControls();
+  }
+
+  void updateScreenGeometry() {
+    lineLeft = width * 0.08;
+    lineRight = width * 0.92;
+    lineY = height * 0.60;
+  }
+
+  void drawHeader() {
+    fill(C_TEXT);
+    textSize(min(32, width * 0.035));
+    text(EMOJI_ACHILLES + " ZENO'S PARADOX — ACHILLES AND THE TORTOISE " + EMOJI_TORTOISE, width / 2, height * 0.055);
+
+    if (deepZoomMode) {
+      fill(C_PASSED);
+      textSize(min(18, width * 0.022));
+      text(EMOJI_ACHILLES + " ➡️ REACHES EACH " + EMOJI_TORTOISE + " POSITION — SPACE SCALES INTO " + EMOJI_TARGET, width / 2, height * 0.105);
+    } else {
+      fill(C_REMAIN);
+      textSize(min(18, width * 0.022));
+      text(EMOJI_STAGE + " STATIC VIEW: 122 ZENO STAGES APPROACH THE LIMIT", width / 2, height * 0.105);
+    }
+  }
+
+  void drawInformation() {
+    fill(C_TEXT);
+    textSize(17);
+    text(EMOJI_STAGE + " STAGE " + stage + " / " + MAX_STAGE, width * 0.12, height * 0.18);
+
+    fill(C_ACHILLES);
+    text(EMOJI_ACHILLES + " ACHILLES  " + formatPosition(currentRem), width * 0.48, height * 0.18);
+
+    fill(C_REMAIN);
+    text(EMOJI_GAP + " GAP  " + scientificOrDecimal(currentRem), width * 0.84, height * 0.18);
+
+    fill(C_STAGE);
+    textSize(22);
+    text(EMOJI_TORTOISE + " NEXT TORTOISE POSITION: " + fractionText(stage), width / 2, height * 0.255);
+
+    fill(C_TEXT);
+    textSize(15);
+    text(EMOJI_GAP + " Remaining gap to " + EMOJI_TARGET + " meeting point = " + scientificOrDecimal(currentRem), width / 2, height * 0.325);
+  }
+
+  void updateAnimation() {
+    if (!moving && !autoPlay) return;
+
+    if (autoPlay) {
+      moving = true;
+      currentRem *= 0.95;
+
+      if (currentRem < Math.pow(2.0, -MAX_STAGE)) {
+        currentRem = Math.pow(2.0, -MAX_STAGE);
+      }
+
+      int newStage = (int)Math.floor(-Math.log(currentRem) / Math.log(2.0)) + 1;
+      if (newStage > stage && newStage <= MAX_STAGE) {
+        stage = newStage;
+        flashAlpha = 40;
+      }
+
+      if (currentRem <= Math.pow(2.0, -MAX_STAGE)) {
+        stage = MAX_STAGE;
+        currentRem = Math.pow(2.0, -MAX_STAGE);
+        targetRem = currentRem;
+        autoPlay = false;
+        moving = false;
+        flashAlpha = 150;
+        return;
+      }
+
+      targetRem = Math.pow(2.0, -stage);
+      animStartRem = currentRem;
+      animEndRem = targetRem;
+      return;
+    }
+
+    animationFrame++;
+    float t = constrain((float)animationFrame / (float)ANIMATION_FRAMES, 0.0, 1.0);
+    float smooth = t * t * (3.0 - 2.0 * t);
+    
+    currentRem = animStartRem + (animEndRem - animStartRem) * smooth;
+
+    if (t >= 1.0) {
+      currentRem = animEndRem;
+      moving = false;
+      flashAlpha = 100;
+      if (stage < MAX_STAGE) {
+        stage++;
+        targetRem = Math.pow(2.0, -stage);
+      }
+    }
+  }
+
+  void updateCamera() {
+    dynamicZoomFactor += (deepZoomMode ? 1.0 - dynamicZoomFactor : 0.0 - dynamicZoomFactor) * 0.1;
+    double zoomAnchorThreshold = 0.15;
+    double idealZoom = 1.0;
+
+    if (currentRem < zoomAnchorThreshold) {
+      idealZoom = zoomAnchorThreshold / currentRem;
+    }
+    currentZoom = 1.0 + (idealZoom - 1.0) * dynamicZoomFactor;
+  }
+
+  float mapToScreen(double remainingMath) {
+    double scaledRem = remainingMath * currentZoom;
+    float widthPx = lineRight - lineLeft;
+    return (float)(lineRight - (scaledRem * widthPx));
+  }
+
+  void startNextStep() {
+    if (moving || stage >= MAX_STAGE) return;
+    animStartRem = currentRem;
+    animEndRem = Math.pow(2.0, -stage);
+    animationFrame = 0;
+    moving = true;
+  }
+
+  void reset() {
+    currentRem = 1.0;
+    targetRem = 0.5;
+    animStartRem = 1.0;
+    animEndRem = 0.5;
+    stage = 1;
+    moving = false;
+    autoPlay = false;
+    dynamicZoomFactor = 1.0;
+    currentZoom = 1.0;
+    flashAlpha = 255;
+  }
+
+  void drawNumberLine() {
+    stroke(C_AXIS);
+    strokeWeight(4);
+    line(lineLeft, lineY, lineRight, lineY);
+
+    fill(C_AXIS);
+    noStroke();
+    triangle(lineLeft, lineY, lineLeft + 16, lineY - 8, lineLeft + 16, lineY + 8);
+    triangle(lineRight, lineY, lineRight - 16, lineY - 8, lineRight - 16, lineY + 8);
+  }
+
+  void drawZenoLines() {
+    float verticalTop = height * 0.40;
+    float verticalBottom = height * 0.70;
+
+    for (int n = 1; n <= MAX_STAGE; n++) {
+      double lineRem = Math.pow(2.0, -n);
+      float sx = mapToScreen(lineRem);
+
+      if (sx < -100 || sx > width + 100) continue;
+
+      float gapPx = (float)(Math.abs(mapToScreen(lineRem) - mapToScreen(lineRem * 2.0)));
+      if (gapPx < 0.1) continue;
+
+      float lineAlpha = constrain(map(gapPx, 0.2, 15.0, 5, 255), 0, 255);
+      boolean passed = currentRem <= lineRem + 1e-18;
+      boolean isTarget = (n == stage);
+
+      int activeColor = C_GRID;
+      int weight = 2;
+
+      if (isTarget) {
+        activeColor = C_STAGE;
+        weight = 5;
+      } else if (passed) {
+        activeColor = C_PASSED;
+        weight = 3;
+      }
+
+      stroke(red(activeColor), green(activeColor), blue(activeColor), lineAlpha);
+      strokeWeight(weight);
+      line(sx, verticalTop, sx, verticalBottom);
+
+      float textAlpha = 0;
+      if (deepZoomMode) {
+        if (n >= stage - 1 && n <= stage + 3) {
+          textAlpha = 255 - max(0, (n - stage) * 50);
+        }
+      } else {
+        textAlpha = map(gapPx, 10, 45, 0, 255);
+      }
+      textAlpha = constrain(textAlpha, 0, 255);
+
+      if (textAlpha > 5) {
+        if (isTarget) fill(red(C_STAGE), green(C_STAGE), blue(C_STAGE), textAlpha);
+        else if (passed) fill(red(C_PASSED), green(C_PASSED), blue(C_PASSED), textAlpha);
+        else fill(red(C_TEXT), green(C_TEXT), blue(C_TEXT), textAlpha);
+
+        noStroke();
+        textSize((n <= 6 || deepZoomMode) ? 16 : 12);
+        text(fractionText(n), sx, verticalTop - 20);
+      }
+    }
+
+    float destX = lineRight;
+    float pulse = (sin(frameCount * 0.08f) + 1.0f) * 0.5f;
+
+    stroke(red(C_DESTINATION), green(C_DESTINATION), blue(C_DESTINATION), 30 + 50 * pulse);
+    strokeWeight(12);
+    line(destX, verticalTop - 25, destX, verticalBottom + 25);
+
+    stroke(C_DESTINATION);
+    strokeWeight(7);
+    line(destX, verticalTop - 25, destX, verticalBottom + 25);
+
+    fill(C_DESTINATION);
+    noStroke();
+    textSize(20);
+    text(EMOJI_TARGET + " MEETING POINT", destX, verticalTop - 70);
+
+    if (!autoPlay) {
+      fill(red(C_DESTINATION), green(C_DESTINATION), blue(C_DESTINATION), 150 + 105 * pulse);
+      textSize(14);
+      text(EMOJI_TAP + " TAP TO AUTO-DIVE", destX - 5, verticalTop - 45);
+    }
+  }
+
+  void drawRacePositions() {
+    float achillesX = mapToScreen(currentRem);
+    double tortoiseRem = currentRem * 0.5;
+    float tortoiseX = mapToScreen(tortoiseRem);
+
+    stroke(red(C_TORTOISE), green(C_TORTOISE), blue(C_TORTOISE), 110);
+    strokeWeight(3);
+    line(lineLeft, lineY + 55, lineRight, lineY + 55);
+
+    if (achillesX >= lineLeft && achillesX <= lineRight + 50) {
+      drawAchilles(achillesX, lineY - 65);
+    }
+    if (tortoiseX >= lineLeft && tortoiseX <= lineRight + 50) {
+      drawTortoise(tortoiseX, lineY + 55);
+    }
+
+    if (tortoiseX > achillesX) {
+      float gap = tortoiseX - achillesX;
+      if (gap > 4) {
+        stroke(C_REMAIN);
+        strokeWeight(2);
+        line(achillesX, lineY + 5, tortoiseX, lineY + 5);
+        fill(C_REMAIN);
+        noStroke();
+        textSize(13);
+        text(EMOJI_GAP + " remaining chase gap", (achillesX + tortoiseX) / 2, lineY - 2);
+      }
+    }
+  }
+
+  void drawAchilles(float x, float y) {
+    pushMatrix();
+    translate(x, y);
+    fill(C_ACHILLES);
+    noStroke();
+    ellipse(0, 0, 38, 22);
+    ellipse(22, -10, 18, 18);
+    stroke(C_ACHILLES);
+    strokeWeight(5);
+    line(-10, 10, -18, 25);
+    line(5, 10, 15, 25);
+    stroke(C_TEXT);
+    strokeWeight(3);
+    line(32, -25, 65, -25);
+    fill(C_TEXT);
+    noStroke();
+    triangle(65, -25, 52, -32, 52, -18);
+    textAlign(CENTER, CENTER);
+    textSize(42);
+    fill(C_TEXT);
+    text(EMOJI_ACHILLES, 0, -5);
+    fill(C_ACHILLES);
+    textSize(15);
+    text(EMOJI_ACHILLES + " ACHILLES", 0, -43);
+    popMatrix();
+  }
+
+  void drawTortoise(float x, float y) {
+    pushMatrix();
+    translate(x, y);
+    fill(C_TORTOISE);
+    noStroke();
+    ellipse(0, 0, 48, 30);
+    ellipse(28, -3, 18, 16);
+    stroke(C_TORTOISE);
+    strokeWeight(4);
+    line(-15, 12, -20, 22);
+    line(10, 12, 15, 22);
+    line(-25, 0, -35, -5);
+    textAlign(CENTER, CENTER);
+    textSize(42);
+    fill(C_TEXT);
+    text(EMOJI_TORTOISE, 0, 0);
+    fill(C_TORTOISE);
+    textSize(15);
+    text(EMOJI_TORTOISE + " TORTOISE", 0, 42);
+    popMatrix();
+  }
+
+  void drawFlash() {
+    if (flashAlpha > 0) {
+      fill(255, 255, 255, flashAlpha);
+      noStroke();
+      rect(0, 0, width, height);
+      flashAlpha *= 0.85;
+    }
+  }
+
+  String formatPosition(double rem) {
+    if (rem >= 0.000001 && rem <= 1.0) {
+      return nf((float)(1.0 - rem), 1, 10);
+    } else {
+      return "1.0 - (" + scientificOrDecimal(rem) + ")";
+    }
+  }
+
+  String scientificOrDecimal(double value) {
+    if (value == 0.0) return "0";
+    double absValue = Math.abs(value);
+    if (absValue >= 0.000001 && absValue < 1000000.0) return nf((float)value, 1, 10);
+    int exponent = (int)Math.floor(Math.log10(absValue));
+    double mantissa = value / Math.pow(10.0, exponent);
+    return nf((float)mantissa, 1, 6) + " × 10^" + exponent;
+  }
+
+  String fractionText(int n) {
+    if (n <= 60) {
+      long denominator = 1L << n;
+      long numerator = denominator - 1L;
+      return numerator + "/" + denominator;
+    }
+    return "1 - (1/2^" + n + ")";
+  }
+
+  void drawControls() {
+    float btnY = height * 0.82;
+    float btnH = height * 0.12;
+    float gap = width * 0.04;
+    float btnW = width * 0.20;
+    float x1 = gap;
+    float x2 = x1 + btnW + gap;
+    float x3 = x2 + btnW + gap;
+    float x4 = x3 + btnW + gap;
+
+    rectMode(CORNER);
+    textSize(min(18, width * 0.022));
+
+    fill(C_PANEL); stroke(C_GRID); strokeWeight(2);
+    rect(x1, btnY, btnW, btnH, 15);
+    fill(C_TEXT); text(EMOJI_RESET + " RESET", x1 + btnW / 2, btnY + btnH / 2);
+
+    fill(C_PANEL); stroke(C_GRID); strokeWeight(2);
+    rect(x2, btnY, btnW, btnH, 15);
+    fill(C_STAGE); text(EMOJI_NEXT + " PIERCE NEXT", x2 + btnW / 2, btnY + btnH / 2);
+
+    fill(C_PANEL); stroke(autoPlay ? C_PASSED : C_GRID); strokeWeight(2);
+    rect(x3, btnY, btnW, btnH, 15);
+    fill(autoPlay ? C_PASSED : C_TEXT);
+    text(autoPlay ? EMOJI_STOP + " HALT DIVE" : EMOJI_PLAY + " AUTO DIVE", x3 + btnW / 2, btnY + btnH / 2);
+
+    fill(C_PANEL); stroke(deepZoomMode ? C_REMAIN : C_GRID); strokeWeight(2);
+    rect(x4, btnY, btnW, btnH, 15);
+    fill(deepZoomMode ? C_REMAIN : C_TEXT);
+    text(deepZoomMode ? EMOJI_DYNAMIC + " DYNAMIC" : EMOJI_STATIC + " STATIC", x4 + btnW / 2, btnY + btnH / 2);
+  }
+
+  void handleTouch() {
+    if (mouseX > lineRight - 150 && mouseY > height * 0.25 && mouseY < height * 0.75) {
+      autoPlay = !autoPlay;
+      if(autoPlay) deepZoomMode = true;
+      return;
+    }
+
+    float btnY = height * 0.82, btnH = height * 0.12, gap = width * 0.04, btnW = width * 0.20;
+    float x1 = gap, x2 = x1 + btnW + gap, x3 = x2 + btnW + gap, x4 = x3 + btnW + gap;
+
+    if (mouseY > btnY && mouseY < btnY + btnH) {
+      if (mouseX > x1 && mouseX < x1 + btnW) { reset(); return; }
+      if (mouseX > x2 && mouseX < x2 + btnW) { autoPlay = false; startNextStep(); return; }
+      if (mouseX > x3 && mouseX < x3 + btnW) { autoPlay = !autoPlay; if (autoPlay) deepZoomMode = true; return; }
+      if (mouseX > x4 && mouseX < x4 + btnW) { deepZoomMode = !deepZoomMode; return; }
+    }
+
+    autoPlay = false;
+    startNextStep();
+  }
+}
+
+
+/*
+================================================================
+ SCENE 2: DERIVATIVES (Instantaneous Velocity / Tangent Line)
+ Visualizing dy/dx dynamically as a car moves over a curve.
+================================================================
+*/
+class Scene2_Derivatives {
+  float time = 0;
+  boolean isPlaying = true;
+  
+  void reset() {
+    time = 0;
+    isPlaying = true;
+  }
+  
+  float function(float x) {
+    // Parabolic motion: y = sin(x) * 2.0 + (x * 0.5)
+    return sin(x) * 2.0 + (x * 0.5);
+  }
+  
+  float derivative(float x) {
+    return cos(x) * 2.0 + 0.5;
+  }
+  
+  void render() {
+    background(C_BACKGROUND);
+    
+    // Header
+    fill(C_TEXT);
+    textSize(32);
+    text("DERIVATIVES: Instantaneous Velocity", width/2, height * 0.08);
+    textSize(18);
+    fill(C_PASSED);
+    text("Tangent line represents derivative (dy/dx) at exact point", width/2, height * 0.13);
+    
+    if(isPlaying) time += 0.02;
+    if(time > 15) time = 0;
+    
+    float graphLeft = width * 0.1;
+    float graphRight = width * 0.9;
+    float graphBottom = height * 0.75;
+    float graphTop = height * 0.25;
+    
+    // Axis
+    stroke(C_AXIS);
+    strokeWeight(3);
+    line(graphLeft, graphBottom, graphRight, graphBottom);
+    line(graphLeft, graphTop, graphLeft, graphBottom);
+    
+    // Draw Curve
+    noFill();
+    stroke(C_GRID);
+    strokeWeight(4);
+    beginShape();
+    for(float px = graphLeft; px <= graphRight; px += 2) {
+      float mapX = map(px, graphLeft, graphRight, 0, 15);
+      float mapY = function(mapX);
+      float py = map(mapY, -2, 10, graphBottom, graphTop);
+      vertex(px, py);
+    }
+    endShape();
+    
+    // Current Point
+    float curX = map(time, 0, 15, graphLeft, graphRight);
+    float curVal = function(time);
+    float curY = map(curVal, -2, 10, graphBottom, graphTop);
+    
+    // Tangent Line
+    float slope = derivative(time); 
+    // visual scaling for screen coords
+    float screenSlope = slope * ((graphBottom - graphTop) / 12.0) / ((graphRight - graphLeft) / 15.0);
+    
+    float tanLength = 150;
+    float x1 = curX - tanLength;
+    float y1 = curY - (screenSlope * -tanLength);
+    float x2 = curX + tanLength;
+    float y2 = curY - (screenSlope * tanLength);
+    
+    stroke(C_CURRENT);
+    strokeWeight(3);
+    line(x1, y1, x2, y2);
+    
+    // Point marker
+    fill(C_ACHILLES);
+    noStroke();
+    ellipse(curX, curY, 20, 20);
+    
+    // Info Panel
+    fill(C_PANEL);
+    stroke(C_GRID);
+    strokeWeight(2);
+    rect(width*0.1, height*0.8, width*0.8, height*0.15, 10);
+    
+    fill(C_TEXT);
+    textSize(24);
+    text("Time (x) = " + nf(time, 1, 2), width*0.25, height*0.87);
+    text("Position f(x) = " + nf(curVal, 1, 2), width*0.5, height*0.87);
+    
+    fill(C_CURRENT);
+    text("Velocity f'(x) = " + nf(slope, 1, 2), width*0.75, height*0.87);
+  }
+  
+  void handleTouch() {
+    if (mouseY > height*0.2) isPlaying = !isPlaying;
+  }
+}
+
+
+/*
+================================================================
+ SCENE 3: INTEGRALS (Riemann Sums to exact Area)
+ Visualizing sum f(x)dx -> Integral
+================================================================
+*/
+class Scene3_Integrals {
+  int nRects = 4;
+  
+  void reset() {
+    nRects = 4;
+  }
+  
+  float f(float x) {
+    return -0.2 * x * x + x + 2; 
+  }
+  
+  void render() {
+    background(C_BACKGROUND);
+    
+    fill(C_TEXT);
+    textSize(32);
+    text("INTEGRALS: Riemann Sum Convergence", width/2, height * 0.08);
+    textSize(18);
+    fill(C_PASSED);
+    text("As Δx → 0 (n → ∞), the sum exactly matches the continuous area", width/2, height * 0.13);
+    
+    float gLeft = width * 0.15;
+    float gRight = width * 0.85;
+    float gBottom = height * 0.7;
+    float gTop = height * 0.25;
+    
+    stroke(C_AXIS);
+    strokeWeight(3);
+    line(gLeft, gBottom, gRight, gBottom);
+    
+    float xStart = 0;
+    float xEnd = 5;
+    
+    // Draw Rectangles
+    float dx = (xEnd - xStart) / nRects;
+    float exactArea = 14.1666f; // precomputed for -0.2x^2 + x + 2 from 0 to 5
+    float approxArea = 0;
+    
+    fill(C_REMAIN);
+    stroke(C_DEEP_BG);
+    strokeWeight(2);
+    
+    for(int i = 0; i < nRects; i++) {
+      float x = xStart + i * dx;
+      float yVal = f(x + dx/2); // Midpoint rule
+      approxArea += yVal * dx;
+      
+      float rx = map(x, xStart, xEnd, gLeft, gRight);
+      float rw = (gRight - gLeft) / nRects;
+      float ry = map(yVal, 0, 4, gBottom, gTop);
+      
+      rect(rx, ry, rw, gBottom - ry);
+    }
+    
+    // Draw True Curve
+    noFill();
+    stroke(C_CURRENT);
+    strokeWeight(4);
+    beginShape();
+    for(float px = gLeft; px <= gRight; px += 2) {
+      float mapX = map(px, gLeft, gRight, xStart, xEnd);
+      float mapY = f(mapX);
+      float py = map(mapY, 0, 4, gBottom, gTop);
+      vertex(px, py);
+    }
+    endShape();
+    
+    // Info
+    fill(C_TEXT);
+    textSize(24);
+    text("Rectangles (n): " + nRects, width/2, height*0.78);
+    text("Approximate Area: " + nf(approxArea, 1, 3), width*0.3, height*0.85);
+    fill(C_CURRENT);
+    text("Exact Integral: " + nf(exactArea, 1, 3), width*0.7, height*0.85);
+    
+    // Controls
+    drawBtn(width*0.2, height*0.9, "Decrease n", nRects > 2);
+    drawBtn(width*0.8, height*0.9, "Increase n", nRects < 200);
+  }
+  
+  void drawBtn(float cx, float cy, String txt, boolean active) {
+    fill(C_PANEL);
+    stroke(active ? C_GRID : color(40));
+    strokeWeight(2);
+    rectMode(CENTER);
+    rect(cx, cy, 200, 60, 10);
+    fill(active ? C_TEXT : color(100));
+    textSize(18);
+    text(txt, cx, cy);
+    rectMode(CORNER);
+  }
+  
+  void handleTouch() {
+    if (mouseY > height*0.85) {
+      if (mouseX < width/2 && nRects > 2) nRects = max(2, nRects / 2);
+      if (mouseX > width/2 && nRects < 200) nRects *= 2;
+    }
+  }
+}
+
+
+/*
+================================================================
+ SCENE 4: DIFFERENTIAL EQUATIONS (Spring-Mass / Harmonic)
+ m*a = -k*x - c*v 
+================================================================
+*/
+class Scene4_DiffEq {
+  float x, v, a;
+  float k = 0.05; // Spring constant
+  float m = 1.0;  // Mass
+  float c = 0.01; // Damping
+  float[] history;
+  int hIndex = 0;
+  
+  void reset() {
+    x = 200; // Initial displacement
+    v = 0;
+    history = new float[width];
+    for(int i=0; i<history.length; i++) history[i] = 0;
+    hIndex = 0;
+  }
+  
+  void render() {
+    background(C_BACKGROUND);
+    
+    fill(C_TEXT);
+    textSize(32);
+    text("DIFFERENTIAL EQUATIONS: Harmonic Oscillator", width/2, height * 0.08);
+    textSize(18);
+    fill(C_PASSED);
+    text("m·x'' + c·x' + k·x = 0  (Damped Spring System)", width/2, height * 0.13);
+    
+    // Physics Step (Euler Integration)
+    a = (-k * x - c * v) / m;
+    v += a;
+    x += v;
+    
+    history[hIndex] = x;
+    hIndex = (hIndex + 1) % width;
+    
+    float anchorX = width * 0.2;
+    float anchorY = height * 0.4;
+    
+    // Draw Trace (History)
+    noFill();
+    stroke(C_REMAIN);
+    strokeWeight(3);
+    beginShape();
+    for (int i = 0; i < width - anchorX; i++) {
+      int idx = (hIndex - i - 1 + width) % width;
+      float py = anchorY + history[idx];
+      vertex(anchorX + i, py);
+    }
+    endShape();
+    
+    // Draw Spring
+    stroke(C_GRID);
+    strokeWeight(4);
+    line(anchorX, height*0.2, anchorX, anchorY + x);
+    
+    // Draw Mass
+    fill(C_ACHILLES);
+    noStroke();
+    rectMode(CENTER);
+    rect(anchorX, anchorY + x, 60, 60, 10);
+    rectMode(CORNER);
+    
+    // Realtime variables
+    fill(C_PANEL);
+    stroke(C_GRID);
+    strokeWeight(2);
+    rect(width*0.5, height*0.75, width*0.4, height*0.2, 10);
+    
+    fill(C_TEXT);
+    textAlign(LEFT, CENTER);
+    textSize(20);
+    text("Position (x): " + nf(x, 1, 2), width*0.55, height*0.8);
+    text("Velocity (v): " + nf(v, 1, 2), width*0.55, height*0.85);
+    text("Acceleration (a): " + nf(a, 1, 2), width*0.55, height*0.9);
+    textAlign(CENTER, CENTER);
+  }
+  
+  void handleTouch() {
+    // Perturb the system
+    x = 200;
+    v = 0;
+  }
+}
+
+
+/*
+================================================================
+ SCENE 5: PDEs & APPLIED MATH (Fluid Flow / Potential Flow)
+ Navier-Stokes / D'Alembert's Paradox representation
+================================================================
+*/
+class Scene5_Fluids {
+  class Particle {
+    float x, y;
+    boolean active;
+  }
+  
+  Particle[] particles;
+  float cylinderR = 80;
+  float cx, cy;
+  
+  void reset() {
+    cx = width / 2;
+    cy = height / 2;
+    particles = new Particle[300];
+    for (int i = 0; i < particles.length; i++) {
+      particles[i] = new Particle();
+      spawn(particles[i], true);
+    }
+  }
+  
+  void spawn(Particle p, boolean randomX) {
+    p.x = randomX ? random(0, width) : 0;
+    p.y = random(0, height);
+    p.active = true;
+  }
+  
+  void render() {
+    background(C_BACKGROUND);
+    
+    fill(C_TEXT);
+    textSize(32);
+    text("PDEs & APPLIED MATH: Potential Fluid Flow", width/2, height * 0.08);
+    textSize(18);
+    fill(C_PASSED);
+    text("∇·u = 0  |  Visualizing Ideal Inviscid Flow (D'Alembert's Paradox)", width/2, height * 0.13);
+    
+    // Draw Cylinder
+    fill(C_PANEL);
+    stroke(C_CURRENT);
+    strokeWeight(4);
+    ellipse(cx, cy, cylinderR*2, cylinderR*2);
+    
+    // Update and draw particles
+    fill(C_REMAIN, 150);
+    noStroke();
+    
+    float U = 4.0; // Free stream velocity
+    
+    for (Particle p : particles) {
+      if (!p.active) continue;
+      
+      // Transform to cylinder coordinates
+      float dx = p.x - cx;
+      float dy = p.y - cy;
+      float r2 = dx*dx + dy*dy;
+      
+      if (r2 < cylinderR*cylinderR) {
+        // Hit cylinder, respawn
+        spawn(p, false);
+        continue;
+      }
+      
+      // Flow equations (Ideal flow around cylinder)
+      float R2 = cylinderR * cylinderR;
+      float vx = U * (1 - R2 * (dx*dx - dy*dy) / (r2*r2));
+      float vy = U * (-2 * R2 * dx * dy / (r2*r2));
+      
+      p.x += vx;
+      p.y += vy;
+      
+      ellipse(p.x, p.y, 4, 4);
+      
+      // Screen bounds
+      if (p.x > width || p.y < 0 || p.y > height) {
+        spawn(p, false);
+      }
+    }
+    
+    fill(C_TEXT);
+    textSize(16);
+    text("Particles follow exact analytic solutions to Laplace's equation for inviscid flow.", width/2, height*0.92);
+  }
+  
+  void handleTouch() {
+    // Tap to randomize particles
+    for (Particle p : particles) spawn(p, true);
+  }
+}
