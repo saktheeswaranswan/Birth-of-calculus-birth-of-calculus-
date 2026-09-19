@@ -1,0 +1,541 @@
+/*
+================================================================
+ ZENO'S PARADOX — THRESHOLD-ANCHORED ZOOM ENGINE
+ ARROW TRAVELS TO GREEN ZONE ➔ STOPS ➔ SPACE SCALES OUT
+ FULL VERTICAL BOUNDARIES & INFINITE FOG
+ APDE / PROCESSING FOR ANDROID
+================================================================
+*/
+
+// ================================================================
+// SCREEN GEOMETRY
+// ================================================================
+
+float lineLeft;
+float lineRight;
+float lineY;
+
+
+// ================================================================
+// MATHEMATICAL STATE
+// ================================================================
+
+double currentRem = 1.0;
+double targetRem = 0.5;
+
+double animStartRem = 1.0;
+double animEndRem = 0.5;
+
+int stage = 1;
+final int MAX_STAGE = 122;
+
+
+// ================================================================
+// ANIMATION
+// ================================================================
+
+boolean moving = false;
+boolean autoPlay = false;
+
+boolean deepZoomMode = true;
+double dynamicZoomFactor = 1.0;
+
+int animationFrame = 0;
+final int ANIMATION_FRAMES = 25; // Speed of manual stepping
+
+float flashAlpha = 0;
+
+
+// ================================================================
+// LOGARITHMIC CAMERA
+// ================================================================
+
+double currentZoom = 1.0;
+
+
+// ================================================================
+// COLORS
+// ================================================================
+
+int C_BACKGROUND;
+int C_DEEP_BG;
+int C_AXIS;
+int C_GRID;
+int C_TEXT;
+int C_CURRENT;
+int C_PASSED;
+int C_ARROW;
+int C_REMAIN;
+int C_PANEL;
+int C_DESTINATION;
+
+
+// ================================================================
+// SETUP
+// ================================================================
+
+void setup() {
+
+  fullScreen();
+  orientation(LANDSCAPE);
+
+  C_BACKGROUND  = color(7, 11, 20);
+  C_DEEP_BG     = color(4, 8, 15);
+
+  C_AXIS        = color(235, 235, 235);
+  C_GRID        = color(75, 90, 115);
+
+  C_TEXT        = color(245, 245, 245);
+
+  C_CURRENT     = color(255, 185, 45);
+  C_PASSED      = color(55, 220, 145);
+
+  C_ARROW       = color(255, 70, 70);
+  C_REMAIN      = color(75, 190, 255);
+
+  C_PANEL       = color(18, 26, 42);
+
+  C_DESTINATION = color(255, 185, 45);
+
+  textAlign(CENTER, CENTER);
+  textFont(createFont("Sans", 22));
+  frameRate(60);
+}
+
+
+// ================================================================
+// DRAW
+// ================================================================
+
+void draw() {
+
+  updateScreenGeometry();
+
+  updateAnimation();
+  updateCamera();
+
+  if (deepZoomMode) {
+    background(C_DEEP_BG);
+  } else {
+    background(C_BACKGROUND);
+  }
+
+  drawHeader();
+  drawInformation();
+  drawNumberLine();
+  drawZenoLines();
+  drawArrow();
+  drawFlash();
+  drawControls();
+}
+
+
+// ================================================================
+// SCREEN GEOMETRY
+// ================================================================
+
+void updateScreenGeometry() {
+  lineLeft  = width * 0.08;
+  lineRight = width * 0.92;
+  lineY = height * 0.60;
+}
+
+
+// ================================================================
+// HEADER & INFO
+// ================================================================
+
+void drawHeader() {
+  fill(C_TEXT);
+  textSize(min(32, width * 0.035));
+  text("ZENO'S PARADOX (" + MAX_STAGE + " LINES)", width / 2, height * 0.055);
+
+  if (deepZoomMode) {
+    fill(C_PASSED);
+    textSize(min(18, width * 0.022));
+    text("AUTO-FIT MODE: ARROW TRAVELS TO ZONE & SPACE SCALES OUT", width / 2, height * 0.105);
+  } else {
+    fill(C_REMAIN);
+    textSize(min(18, width * 0.022));
+    text("STATIC VIEW: 122 LINES PILING UP AT THE LIMIT", width / 2, height * 0.105);
+  }
+}
+
+void drawInformation() {
+  fill(C_TEXT);
+  textSize(17);
+  text("STAGE " + stage + " / " + MAX_STAGE, width * 0.12, height * 0.18);
+
+  fill(C_PASSED);
+  text("POSITION  " + formatPosition(currentRem), width * 0.50, height * 0.18);
+
+  fill(C_REMAIN);
+  text("REMAINING  " + scientificOrDecimal(currentRem), width * 0.85, height * 0.18);
+
+  fill(C_CURRENT);
+  textSize(22);
+  text("NEXT TARGET: " + fractionText(stage), width / 2, height * 0.255);
+
+  fill(C_TEXT);
+  textSize(15);
+  text("Microscopic Gap Size = " + scientificOrDecimal(currentRem), width / 2, height * 0.325);
+}
+
+
+// ================================================================
+// ANIMATION LOGIC
+// ================================================================
+
+void updateAnimation() {
+
+  if (!moving && !autoPlay) return;
+
+  // --------------------------------------------------------------
+  // CONTINUOUS AUTOPILOT
+  // --------------------------------------------------------------
+  if (autoPlay) {
+    moving = true;
+    currentRem *= 0.95; // Smooth exponential dive 5% per frame
+    
+    // Check if we mathematically crossed the next boundary
+    int newStage = (int) Math.floor(-Math.log(currentRem) / Math.log(2.0)) + 1;
+    
+    if (newStage > stage && newStage <= MAX_STAGE) {
+       stage = newStage;
+       flashAlpha = 40; // Soft pulse as we penetrate lines
+    }
+    
+    if (stage >= MAX_STAGE) {
+       stage = MAX_STAGE;
+       currentRem = Math.pow(2.0, -MAX_STAGE);
+       autoPlay = false;
+       moving = false;
+       flashAlpha = 150;
+    }
+    
+    targetRem = Math.pow(2.0, -stage);
+    animStartRem = currentRem;
+    animEndRem = targetRem;
+    return;
+  }
+
+  // --------------------------------------------------------------
+  // MANUAL STEP-BY-STEP (PIERCE NEXT)
+  // --------------------------------------------------------------
+  animationFrame++;
+  float t = constrain((float)animationFrame / (float)ANIMATION_FRAMES, 0.0, 1.0);
+  
+  float smooth = t * t * (3.0 - 2.0 * t);
+  currentRem = animStartRem + (animEndRem - animStartRem) * smooth;
+
+  if (t >= 1.0) {
+    currentRem = animEndRem;
+    moving = false;
+    flashAlpha = 100;
+    
+    if (stage < MAX_STAGE) {
+      stage++;
+      targetRem = Math.pow(2.0, -stage);
+    }
+  }
+}
+
+
+// ================================================================
+// THRESHOLD-ANCHORED ZOOM CAMERA
+// ================================================================
+
+void updateCamera() {
+  
+  // Smooth toggle between Static (0.0) and Dynamic (1.0) modes
+  dynamicZoomFactor += (deepZoomMode ? 1.0 - dynamicZoomFactor : 0.0 - dynamicZoomFactor) * 0.1;
+  
+  // --------------------------------------------------------------
+  // THE GREEN MARKED AREA THRESHOLD
+  // 0.15 means the camera won't zoom until the arrow reaches 
+  // exactly 85% across the screen (the dense cluster zone)
+  // --------------------------------------------------------------
+  double zoomAnchorThreshold = 0.15; 
+  
+  double idealZoom = 1.0;
+
+  // Only scale the space once the arrow enters the green marked zone
+  if (currentRem < zoomAnchorThreshold) {
+      idealZoom = zoomAnchorThreshold / currentRem;
+  }
+  
+  // Blend mathematically to eliminate any wobble
+  currentZoom = 1.0 + (idealZoom - 1.0) * dynamicZoomFactor;
+}
+
+
+// ================================================================
+// MAP MATHEMATICS TO SCREEN
+// ================================================================
+
+float mapToScreen(double remainingMath) {
+  double scaledRem = remainingMath * currentZoom;
+  float widthPx = lineRight - lineLeft;
+  
+  // Anchors the 1.0 Limit strictly at the right edge
+  // Lines always spread leftward, never move left-to-right.
+  return (float)(lineRight - (scaledRem * widthPx));
+}
+
+
+// ================================================================
+// START NEXT ZENO STEP
+// ================================================================
+
+void startNextStep() {
+  if (moving || stage > MAX_STAGE) return;
+  
+  animStartRem = currentRem;
+  animEndRem = targetRem;
+  animationFrame = 0;
+  moving = true;
+}
+
+void reset() {
+  currentRem = 1.0;
+  targetRem = 0.5;
+  animStartRem = 1.0;
+  animEndRem = 0.5;
+  stage = 1;
+  moving = false;
+  autoPlay = false;
+  flashAlpha = 255;
+}
+
+
+// ================================================================
+// NUMBER LINE & ZENO LINES
+// ================================================================
+
+void drawNumberLine() {
+  stroke(C_AXIS);
+  strokeWeight(4);
+  line(lineLeft, lineY, lineRight, lineY);
+  
+  fill(C_AXIS);
+  noStroke();
+  triangle(lineLeft, lineY, lineLeft + 16, lineY - 8, lineLeft + 16, lineY + 8);
+  triangle(lineRight, lineY, lineRight - 16, lineY - 8, lineRight - 16, lineY + 8);
+}
+
+void drawZenoLines() {
+  float verticalTop = height * 0.40;
+  float verticalBottom = height * 0.70;
+
+  for (int n = 1; n <= MAX_STAGE; n++) {
+    double lineRem = Math.pow(2.0, -n);
+    float sx = mapToScreen(lineRem);
+
+    if (sx < -100 || sx > width + 100) continue;
+
+    float gapPx = (float)(Math.abs(mapToScreen(lineRem) - mapToScreen(lineRem * 2.0)));
+
+    // Skip lines that are deeply subpixel to save rendering
+    if (gapPx < 0.1) continue;
+
+    // Lines smoothly fade in as they are pulled out of the infinite cluster
+    float lineAlpha = constrain(map(gapPx, 0.2, 15.0, 5, 255), 0, 255);
+
+    boolean passed = currentRem <= lineRem + 1e-18;
+    boolean isTarget = (n == stage);
+
+    int activeColor = C_GRID;
+    int weight = 2;
+
+    if (isTarget) {
+      activeColor = C_CURRENT;
+      weight = 5;
+    } else if (passed) {
+      activeColor = C_PASSED;
+      weight = 3;
+    } 
+
+    stroke(red(activeColor), green(activeColor), blue(activeColor), lineAlpha);
+    strokeWeight(weight);
+    line(sx, verticalTop, sx, verticalBottom);
+
+    // Dynamic Labels appear cleanly as lines spread out
+    float textAlpha = 0;
+    if (deepZoomMode) {
+      if (n >= stage - 1 && n <= stage + 3) {
+         textAlpha = 255 - max(0, (n - stage) * 50);
+      }
+    } else {
+      textAlpha = map(gapPx, 10, 45, 0, 255);
+    }
+    
+    textAlpha = constrain(textAlpha, 0, 255);
+
+    if (textAlpha > 5) {
+      if (isTarget) fill(red(C_CURRENT), green(C_CURRENT), blue(C_CURRENT), textAlpha);
+      else if (passed) fill(red(C_PASSED), green(C_PASSED), blue(C_PASSED), textAlpha);
+      else fill(red(C_TEXT), green(C_TEXT), blue(C_TEXT), textAlpha);
+
+      noStroke();
+      textSize((n <= 6 || deepZoomMode) ? 16 : 12);
+      text(fractionText(n), sx, verticalTop - 20);
+    }
+  }
+
+  // LIMIT WALL - TAPPABLE
+  float destX = lineRight;
+  float pulse = (sin(frameCount * 0.08f) + 1.0f) * 0.5f;
+  
+  stroke(red(C_DESTINATION), green(C_DESTINATION), blue(C_DESTINATION), 30 + 50 * pulse);
+  strokeWeight(12);
+  line(destX, verticalTop - 25, destX, verticalBottom + 25);
+
+  stroke(C_DESTINATION);
+  strokeWeight(7);
+  line(destX, verticalTop - 25, destX, verticalBottom + 25);
+
+  fill(C_DESTINATION);
+  noStroke();
+  textSize(20);
+  text("1.0 LIMIT", destX, verticalTop - 70);
+  
+  if (!autoPlay) {
+    fill(red(C_DESTINATION), green(C_DESTINATION), blue(C_DESTINATION), 150 + 105 * pulse);
+    textSize(14);
+    text("(TAP TO AUTO-DIVE)", destX - 5, verticalTop - 45);
+  }
+}
+
+
+// ================================================================
+// CONSTANT-LENGTH ARROW
+// ================================================================
+
+void drawArrow() {
+  float sx = mapToScreen(currentRem);
+  if (sx < -200 || sx > width + 200) return;
+
+  float arrowLength = width * 0.12;
+  float tailX = sx - arrowLength;
+  if (tailX < lineLeft) tailX = lineLeft;
+
+  stroke(C_ARROW);
+  strokeWeight(6);
+  line(tailX, lineY - 42, sx, lineY - 42);
+
+  fill(C_ARROW);
+  noStroke();
+  triangle(sx + 25, lineY - 42, sx - 8, lineY - 64, sx - 8, lineY - 20);
+
+  stroke(255);
+  strokeWeight(3);
+  line(sx, lineY - 12, sx, lineY + 20);
+}
+
+
+// ================================================================
+// FLASH
+// ================================================================
+
+void drawFlash() {
+  if (flashAlpha > 0) {
+    fill(255, 255, 255, flashAlpha);
+    noStroke();
+    rect(0, 0, width, height);
+    flashAlpha *= 0.85;
+  }
+}
+
+
+// ================================================================
+// FORMATTERS
+// ================================================================
+
+String formatPosition(double rem) {
+  if (rem >= 0.000001 && rem <= 1.0) {
+    return nf((float)(1.0 - rem), 1, 10);
+  } else {
+    return "1.0 - (" + scientificOrDecimal(rem) + ")";
+  }
+}
+
+String scientificOrDecimal(double value) {
+  if (value == 0.0) return "0";
+  double absValue = Math.abs(value);
+  if (absValue >= 0.000001 && absValue < 1000000.0) return nf((float)value, 1, 10);
+  
+  int exponent = (int)Math.floor(Math.log10(absValue));
+  double mantissa = value / Math.pow(10.0, exponent);
+  return nf((float)mantissa, 1, 6) + " × 10^" + exponent;
+}
+
+String fractionText(int n) {
+  if (n <= 60) {
+    long denominator = 1L << n;
+    long numerator = denominator - 1L;
+    return numerator + "/" + denominator;
+  }
+  return "1 - (1/2^" + n + ")";
+}
+
+
+// ================================================================
+// CONTROLS & UI
+// ================================================================
+
+void drawControls() {
+  float btnY = height * 0.82;
+  float btnH = height * 0.12;
+  float gap = width * 0.04;
+  float btnW = width * 0.20;
+  float x1 = gap, x2 = x1 + btnW + gap, x3 = x2 + btnW + gap, x4 = x3 + btnW + gap;
+
+  rectMode(CORNER);
+  textSize(min(18, width * 0.022));
+
+  // RESET
+  fill(C_PANEL); stroke(C_GRID); strokeWeight(2);
+  rect(x1, btnY, btnW, btnH, 15);
+  fill(C_TEXT); text("RESET", x1 + btnW / 2, btnY + btnH / 2);
+
+  // PIERCE NEXT
+  fill(C_PANEL); stroke(C_GRID); strokeWeight(2);
+  rect(x2, btnY, btnW, btnH, 15);
+  fill(C_CURRENT); text("PIERCE NEXT", x2 + btnW / 2, btnY + btnH / 2);
+
+  // AUTO DIVE
+  fill(C_PANEL); stroke(autoPlay ? C_PASSED : C_GRID); strokeWeight(2);
+  rect(x3, btnY, btnW, btnH, 15);
+  fill(autoPlay ? C_PASSED : C_TEXT); text(autoPlay ? "HALT DIVE" : "AUTO DIVE", x3 + btnW / 2, btnY + btnH / 2);
+
+  // CAMERA
+  fill(C_PANEL); stroke(deepZoomMode ? C_REMAIN : C_GRID); strokeWeight(2);
+  rect(x4, btnY, btnW, btnH, 15);
+  fill(deepZoomMode ? C_REMAIN : C_TEXT); text(deepZoomMode ? "MODE: DYNAMIC" : "MODE: STATIC", x4 + btnW / 2, btnY + btnH / 2);
+}
+
+void mousePressed() {
+  // LIMIT WALL TAP (Auto-Dive)
+  if (mouseX > lineRight - 150 && mouseY > height * 0.25 && mouseY < height * 0.75) {
+      if (!autoPlay) {
+          autoPlay = true; deepZoomMode = true; 
+      } else {
+          autoPlay = false;
+      }
+      return;
+  }
+
+  float btnY = height * 0.82, btnH = height * 0.12, gap = width * 0.04, btnW = width * 0.20;
+  float x1 = gap, x2 = x1 + btnW + gap, x3 = x2 + btnW + gap, x4 = x3 + btnW + gap;
+
+  if (mouseY > btnY && mouseY < btnY + btnH) {
+    if (mouseX > x1 && mouseX < x1 + btnW) { reset(); return; }
+    if (mouseX > x2 && mouseX < x2 + btnW) { autoPlay = false; startNextStep(); return; }
+    if (mouseX > x3 && mouseX < x3 + btnW) { autoPlay = !autoPlay; if(autoPlay) deepZoomMode = true; return; }
+    if (mouseX > x4 && mouseX < x4 + btnW) { deepZoomMode = !deepZoomMode; return; }
+  }
+
+  // TAP ANYWHERE ELSE = MANUAL STEP
+  autoPlay = false;
+  startNextStep();
+}
