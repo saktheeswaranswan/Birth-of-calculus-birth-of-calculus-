@@ -1,0 +1,2153 @@
+/*
+================================================================
+ ZENO'S PARADOX — ACHILLES AND THE TORTOISE
+ EMOJI CANVAS EDITION
+ THRESHOLD-ANCHORED ZOOM ENGINE
+
+ 🏃 ACHILLES CHASES 🐢 THE TORTOISE
+ ACHILLES REACHES EACH PREVIOUS TORTOISE POSITION
+ TORTOISE HAS MOVED AHEAD
+ INFINITE ZENO STAGES APPROACH THE 🎯 MEETING POINT
+
+ 📍 FULL VERTICAL ZENO BOUNDARIES
+ 🔍 DEEP ZOOM
+ 122 ZENO STAGES
+ 📱 APDE / PROCESSING FOR ANDROID
+================================================================
+*/
+
+
+// ================================================================
+// SCREEN GEOMETRY
+// ================================================================
+
+float lineLeft;
+float lineRight;
+float lineY;
+
+
+// ================================================================
+// EMOJI
+// ================================================================
+
+String EMOJI_ACHILLES = "🏃";
+String EMOJI_TORTOISE = "🐢";
+String EMOJI_TARGET = "🎯";
+String EMOJI_ARROW = "➡️";
+String EMOJI_STAGE = "📍";
+String EMOJI_GAP = "📏";
+String EMOJI_RESET = "🔄";
+String EMOJI_NEXT = "📍";
+String EMOJI_PLAY = "▶️";
+String EMOJI_STOP = "⏹️";
+String EMOJI_DYNAMIC = "🔍";
+String EMOJI_STATIC = "🔭";
+String EMOJI_TAP = "👆";
+
+
+// ================================================================
+// MATHEMATICAL STATE
+// ================================================================
+//
+// Normalized race coordinate:
+//
+// Achilles initially = 0
+// Tortoise initially = 0.5
+// Meeting point      = 1.0
+//
+// Remaining distance to meeting point:
+//
+// Stage 1 = 1/2
+// Stage 2 = 1/4
+// Stage 3 = 1/8
+// ...
+// Stage n = 1/2^n
+//
+// Position at stage n:
+//
+// x = 1 - 1/2^n
+// ================================================================
+
+double currentRem = 1.0;
+
+double targetRem = 0.5;
+
+double animStartRem = 1.0;
+
+double animEndRem = 0.5;
+
+int stage = 1;
+
+final int MAX_STAGE = 122;
+
+
+// ================================================================
+// ANIMATION
+// ================================================================
+
+boolean moving = false;
+
+boolean autoPlay = false;
+
+boolean deepZoomMode = true;
+
+double dynamicZoomFactor = 1.0;
+
+int animationFrame = 0;
+
+final int ANIMATION_FRAMES = 25;
+
+float flashAlpha = 0;
+
+
+// ================================================================
+// CAMERA
+// ================================================================
+
+double currentZoom = 1.0;
+
+
+// ================================================================
+// COLORS
+// ================================================================
+
+int C_BACKGROUND;
+
+int C_DEEP_BG;
+
+int C_AXIS;
+
+int C_GRID;
+
+int C_TEXT;
+
+int C_ACHILLES;
+
+int C_TORTOISE;
+
+int C_PASSED;
+
+int C_REMAIN;
+
+int C_PANEL;
+
+int C_DESTINATION;
+
+int C_STAGE;
+
+
+// ================================================================
+// SETUP
+// ================================================================
+
+void setup() {
+
+  fullScreen();
+
+  orientation(LANDSCAPE);
+
+
+  // --------------------------------------------------------------
+  // COLORS
+  // --------------------------------------------------------------
+
+  C_BACKGROUND = color(7, 11, 20);
+
+  C_DEEP_BG = color(4, 8, 15);
+
+  C_AXIS = color(235, 235, 235);
+
+  C_GRID = color(75, 90, 115);
+
+  C_TEXT = color(245, 245, 245);
+
+  C_ACHILLES = color(255, 70, 70);
+
+  C_TORTOISE = color(80, 210, 120);
+
+  C_PASSED = color(55, 220, 145);
+
+  C_REMAIN = color(75, 190, 255);
+
+  C_PANEL = color(18, 26, 42);
+
+  C_DESTINATION = color(255, 185, 45);
+
+  C_STAGE = color(255, 185, 45);
+
+
+  // --------------------------------------------------------------
+  // TEXT
+  // --------------------------------------------------------------
+
+  textAlign(CENTER, CENTER);
+
+  textFont(createFont("Sans", 22));
+
+
+  // --------------------------------------------------------------
+  // FRAME RATE
+  // --------------------------------------------------------------
+
+  frameRate(60);
+}
+
+
+// ================================================================
+// DRAW
+// ================================================================
+
+void draw() {
+
+  updateScreenGeometry();
+
+  updateAnimation();
+
+  updateCamera();
+
+
+  // --------------------------------------------------------------
+  // BACKGROUND
+  // --------------------------------------------------------------
+
+  if (deepZoomMode) {
+
+    background(C_DEEP_BG);
+
+  } else {
+
+    background(C_BACKGROUND);
+  }
+
+
+  // --------------------------------------------------------------
+  // MAIN DISPLAY
+  // --------------------------------------------------------------
+
+  drawHeader();
+
+  drawInformation();
+
+  drawNumberLine();
+
+  drawZenoLines();
+
+  drawRacePositions();
+
+  drawFlash();
+
+  drawControls();
+}
+
+
+// ================================================================
+// SCREEN GEOMETRY
+// ================================================================
+
+void updateScreenGeometry() {
+
+  lineLeft = width * 0.08;
+
+  lineRight = width * 0.92;
+
+  lineY = height * 0.60;
+}
+
+
+// ================================================================
+// HEADER
+// ================================================================
+
+void drawHeader() {
+
+  fill(C_TEXT);
+
+  textSize(
+    min(32, width * 0.035)
+  );
+
+
+  text(
+    EMOJI_ACHILLES +
+    " ZENO'S PARADOX — ACHILLES AND THE TORTOISE " +
+    EMOJI_TORTOISE,
+
+    width / 2,
+
+    height * 0.055
+  );
+
+
+  if (deepZoomMode) {
+
+    fill(C_PASSED);
+
+    textSize(
+      min(18, width * 0.022)
+    );
+
+
+    text(
+      EMOJI_ACHILLES +
+      " ➡️ REACHES EACH " +
+      EMOJI_TORTOISE +
+      " POSITION — SPACE SCALES INTO " +
+      EMOJI_TARGET,
+
+      width / 2,
+
+      height * 0.105
+    );
+
+
+  } else {
+
+    fill(C_REMAIN);
+
+    textSize(
+      min(18, width * 0.022)
+    );
+
+
+    text(
+      EMOJI_STAGE +
+      " STATIC VIEW: 122 ZENO STAGES APPROACH THE LIMIT",
+
+      width / 2,
+
+      height * 0.105
+    );
+  }
+}
+
+
+// ================================================================
+// INFORMATION
+// ================================================================
+
+void drawInformation() {
+
+  fill(C_TEXT);
+
+  textSize(17);
+
+
+  text(
+    EMOJI_STAGE +
+    " STAGE " +
+    stage +
+    " / " +
+    MAX_STAGE,
+
+    width * 0.12,
+
+    height * 0.18
+  );
+
+
+  fill(C_ACHILLES);
+
+
+  text(
+    EMOJI_ACHILLES +
+    " ACHILLES  " +
+    formatPosition(currentRem),
+
+    width * 0.48,
+
+    height * 0.18
+  );
+
+
+  fill(C_REMAIN);
+
+
+  text(
+    EMOJI_GAP +
+    " GAP  " +
+    scientificOrDecimal(currentRem),
+
+    width * 0.84,
+
+    height * 0.18
+  );
+
+
+  // --------------------------------------------------------------
+  // NEXT TORTOISE POSITION
+  // --------------------------------------------------------------
+
+  fill(C_STAGE);
+
+  textSize(22);
+
+
+  text(
+    EMOJI_TORTOISE +
+    " NEXT TORTOISE POSITION: " +
+    fractionText(stage),
+
+    width / 2,
+
+    height * 0.255
+  );
+
+
+  // --------------------------------------------------------------
+  // REMAINING DISTANCE
+  // --------------------------------------------------------------
+
+  fill(C_TEXT);
+
+  textSize(15);
+
+
+  text(
+    EMOJI_GAP +
+    " Remaining gap to " +
+    EMOJI_TARGET +
+    " meeting point = " +
+    scientificOrDecimal(currentRem),
+
+    width / 2,
+
+    height * 0.325
+  );
+}
+
+
+// ================================================================
+// ANIMATION
+// ================================================================
+
+void updateAnimation() {
+
+  if (!moving && !autoPlay) {
+
+    return;
+  }
+
+
+  // ==============================================================
+  // AUTO DIVE
+  // ==============================================================
+
+  if (autoPlay) {
+
+    moving = true;
+
+
+    // ------------------------------------------------------------
+    // Exponential approach
+    // ------------------------------------------------------------
+
+    currentRem *= 0.95;
+
+
+    // ------------------------------------------------------------
+    // Prevent numerical underflow
+    // ------------------------------------------------------------
+
+    if (currentRem < Math.pow(2.0, -MAX_STAGE)) {
+
+      currentRem =
+        Math.pow(2.0, -MAX_STAGE);
+    }
+
+
+    // ------------------------------------------------------------
+    // Determine Zeno stage
+    // ------------------------------------------------------------
+
+    int newStage =
+      (int)Math.floor(
+        -Math.log(currentRem) /
+        Math.log(2.0)
+      ) + 1;
+
+
+    if (
+      newStage > stage &&
+      newStage <= MAX_STAGE
+    ) {
+
+      stage = newStage;
+
+      flashAlpha = 40;
+    }
+
+
+    // ------------------------------------------------------------
+    // FINAL STAGE
+    // ------------------------------------------------------------
+
+    if (currentRem <=
+        Math.pow(2.0, -MAX_STAGE)) {
+
+      stage = MAX_STAGE;
+
+      currentRem =
+        Math.pow(2.0, -MAX_STAGE);
+
+      targetRem =
+        currentRem;
+
+      autoPlay = false;
+
+      moving = false;
+
+      flashAlpha = 150;
+
+      return;
+    }
+
+
+    // ------------------------------------------------------------
+    // Current target
+    // ------------------------------------------------------------
+
+    targetRem =
+      Math.pow(
+        2.0,
+        -stage
+      );
+
+
+    animStartRem = currentRem;
+
+    animEndRem = targetRem;
+
+    return;
+  }
+
+
+  // ==============================================================
+  // MANUAL ZENO STEP
+  // ==============================================================
+
+  animationFrame++;
+
+
+  float t =
+    constrain(
+      (float)animationFrame /
+      (float)ANIMATION_FRAMES,
+
+      0.0,
+
+      1.0
+    );
+
+
+  // --------------------------------------------------------------
+  // Smoothstep interpolation
+  // --------------------------------------------------------------
+
+  float smooth =
+    t *
+    t *
+    (3.0 - 2.0 * t);
+
+
+  currentRem =
+    animStartRem +
+    (
+      animEndRem -
+      animStartRem
+    ) *
+    smooth;
+
+
+  // --------------------------------------------------------------
+  // STEP COMPLETE
+  // --------------------------------------------------------------
+
+  if (t >= 1.0) {
+
+    currentRem =
+      animEndRem;
+
+    moving = false;
+
+    flashAlpha = 100;
+
+
+    if (stage < MAX_STAGE) {
+
+      stage++;
+
+      targetRem =
+        Math.pow(
+          2.0,
+          -stage
+        );
+    }
+  }
+}
+
+
+// ================================================================
+// THRESHOLD-ANCHORED CAMERA
+// ================================================================
+
+void updateCamera() {
+
+  dynamicZoomFactor +=
+    (
+      deepZoomMode
+      ?
+      1.0 - dynamicZoomFactor
+      :
+      0.0 - dynamicZoomFactor
+    ) *
+    0.1;
+
+
+  // --------------------------------------------------------------
+  // ZOOM THRESHOLD
+  // --------------------------------------------------------------
+
+  double zoomAnchorThreshold = 0.15;
+
+  double idealZoom = 1.0;
+
+
+  if (
+    currentRem <
+    zoomAnchorThreshold
+  ) {
+
+    idealZoom =
+      zoomAnchorThreshold /
+      currentRem;
+  }
+
+
+  // --------------------------------------------------------------
+  // Smooth camera
+  // --------------------------------------------------------------
+
+  currentZoom =
+    1.0 +
+    (
+      idealZoom - 1.0
+    ) *
+    dynamicZoomFactor;
+}
+
+
+// ================================================================
+// MATHEMATICS → SCREEN
+// ================================================================
+
+float mapToScreen(
+  double remainingMath
+) {
+
+  double scaledRem =
+    remainingMath *
+    currentZoom;
+
+
+  float widthPx =
+    lineRight -
+    lineLeft;
+
+
+  // --------------------------------------------------------------
+  // Meeting point remains fixed at the right.
+  // --------------------------------------------------------------
+
+  return (float)(
+    lineRight -
+    (
+      scaledRem *
+      widthPx
+    )
+  );
+}
+
+
+// ================================================================
+// START NEXT ZENO STEP
+// ================================================================
+
+void startNextStep() {
+
+  if (
+    moving ||
+    stage >= MAX_STAGE
+  ) {
+
+    return;
+  }
+
+
+  animStartRem =
+    currentRem;
+
+
+  animEndRem =
+    Math.pow(
+      2.0,
+      -stage
+    );
+
+
+  animationFrame = 0;
+
+  moving = true;
+}
+
+
+// ================================================================
+// RESET
+// ================================================================
+
+void reset() {
+
+  currentRem = 1.0;
+
+  targetRem = 0.5;
+
+  animStartRem = 1.0;
+
+  animEndRem = 0.5;
+
+  stage = 1;
+
+  moving = false;
+
+  autoPlay = false;
+
+  dynamicZoomFactor = 1.0;
+
+  currentZoom = 1.0;
+
+  flashAlpha = 255;
+}
+
+
+// ================================================================
+// NUMBER LINE
+// ================================================================
+
+void drawNumberLine() {
+
+  stroke(C_AXIS);
+
+  strokeWeight(4);
+
+
+  line(
+    lineLeft,
+    lineY,
+    lineRight,
+    lineY
+  );
+
+
+  fill(C_AXIS);
+
+  noStroke();
+
+
+  // --------------------------------------------------------------
+  // LEFT ARROW
+  // --------------------------------------------------------------
+
+  triangle(
+    lineLeft,
+    lineY,
+
+    lineLeft + 16,
+    lineY - 8,
+
+    lineLeft + 16,
+    lineY + 8
+  );
+
+
+  // --------------------------------------------------------------
+  // RIGHT ARROW
+  // --------------------------------------------------------------
+
+  triangle(
+    lineRight,
+    lineY,
+
+    lineRight - 16,
+    lineY - 8,
+
+    lineRight - 16,
+    lineY + 8
+  );
+}
+
+
+// ================================================================
+// ZENO BOUNDARIES
+// ================================================================
+
+void drawZenoLines() {
+
+  float verticalTop =
+    height * 0.40;
+
+  float verticalBottom =
+    height * 0.70;
+
+
+  // ==============================================================
+  // 122 ZENO BOUNDARIES
+  // ==============================================================
+
+  for (
+    int n = 1;
+    n <= MAX_STAGE;
+    n++
+  ) {
+
+    // ------------------------------------------------------------
+    // Remaining distance represented by this boundary
+    // ------------------------------------------------------------
+
+    double lineRem =
+      Math.pow(
+        2.0,
+        -n
+      );
+
+
+    float sx =
+      mapToScreen(
+        lineRem
+      );
+
+
+    // ------------------------------------------------------------
+    // Outside screen
+    // ------------------------------------------------------------
+
+    if (
+      sx < -100 ||
+      sx > width + 100
+    ) {
+
+      continue;
+    }
+
+
+    // ------------------------------------------------------------
+    // Distance to neighboring boundary
+    // ------------------------------------------------------------
+
+    float gapPx =
+      (float)(
+        Math.abs(
+          mapToScreen(lineRem) -
+          mapToScreen(lineRem * 2.0)
+        )
+      );
+
+
+    // ------------------------------------------------------------
+    // Very small subpixel boundary
+    // ------------------------------------------------------------
+
+    if (gapPx < 0.1) {
+
+      continue;
+    }
+
+
+    // ------------------------------------------------------------
+    // Transparency
+    // ------------------------------------------------------------
+
+    float lineAlpha =
+      constrain(
+        map(
+          gapPx,
+
+          0.2,
+          15.0,
+
+          5,
+          255
+        ),
+
+        0,
+        255
+      );
+
+
+    // ------------------------------------------------------------
+    // Has Achilles passed this boundary?
+    // ------------------------------------------------------------
+
+    boolean passed =
+      currentRem <=
+      lineRem + 1e-18;
+
+
+    // ------------------------------------------------------------
+    // Current target
+    // ------------------------------------------------------------
+
+    boolean isTarget =
+      (n == stage);
+
+
+    int activeColor =
+      C_GRID;
+
+    int weight = 2;
+
+
+    if (isTarget) {
+
+      activeColor =
+        C_STAGE;
+
+      weight = 5;
+
+    } else if (passed) {
+
+      activeColor =
+        C_PASSED;
+
+      weight = 3;
+    }
+
+
+    // ------------------------------------------------------------
+    // Boundary
+    // ------------------------------------------------------------
+
+    stroke(
+      red(activeColor),
+      green(activeColor),
+      blue(activeColor),
+      lineAlpha
+    );
+
+
+    strokeWeight(weight);
+
+
+    // ------------------------------------------------------------
+    // FULL VERTICAL BOUNDARY
+    // ------------------------------------------------------------
+
+    line(
+      sx,
+      verticalTop,
+      sx,
+      verticalBottom
+    );
+
+
+    // ============================================================
+    // LABELS
+    // ============================================================
+
+    float textAlpha = 0;
+
+
+    if (deepZoomMode) {
+
+      if (
+        n >= stage - 1 &&
+        n <= stage + 3
+      ) {
+
+        textAlpha =
+          255 -
+          max(
+            0,
+            (n - stage) * 50
+          );
+      }
+
+    } else {
+
+      textAlpha =
+        map(
+          gapPx,
+
+          10,
+          45,
+
+          0,
+          255
+        );
+    }
+
+
+    textAlpha =
+      constrain(
+        textAlpha,
+
+        0,
+        255
+      );
+
+
+    if (textAlpha > 5) {
+
+      if (isTarget) {
+
+        fill(
+          red(C_STAGE),
+          green(C_STAGE),
+          blue(C_STAGE),
+          textAlpha
+        );
+
+      } else if (passed) {
+
+        fill(
+          red(C_PASSED),
+          green(C_PASSED),
+          blue(C_PASSED),
+          textAlpha
+        );
+
+      } else {
+
+        fill(
+          red(C_TEXT),
+          green(C_TEXT),
+          blue(C_TEXT),
+          textAlpha
+        );
+      }
+
+
+      noStroke();
+
+
+      textSize(
+        (
+          n <= 6 ||
+          deepZoomMode
+        )
+        ?
+        16
+        :
+        12
+      );
+
+
+      text(
+        fractionText(n),
+
+        sx,
+
+        verticalTop - 20
+      );
+    }
+  }
+
+
+  // ==============================================================
+  // MEETING POINT WALL
+  // ==============================================================
+
+  float destX =
+    lineRight;
+
+
+  float pulse =
+    (
+      sin(
+        frameCount *
+        0.08f
+      ) +
+      1.0f
+    ) *
+    0.5f;
+
+
+  // --------------------------------------------------------------
+  // Glow
+  // --------------------------------------------------------------
+
+  stroke(
+    red(C_DESTINATION),
+    green(C_DESTINATION),
+    blue(C_DESTINATION),
+    30 + 50 * pulse
+  );
+
+
+  strokeWeight(12);
+
+
+  line(
+    destX,
+    verticalTop - 25,
+
+    destX,
+    verticalBottom + 25
+  );
+
+
+  // --------------------------------------------------------------
+  // Main wall
+  // --------------------------------------------------------------
+
+  stroke(C_DESTINATION);
+
+  strokeWeight(7);
+
+
+  line(
+    destX,
+    verticalTop - 25,
+
+    destX,
+    verticalBottom + 25
+  );
+
+
+  // --------------------------------------------------------------
+  // Meeting point label
+  // --------------------------------------------------------------
+
+  fill(C_DESTINATION);
+
+  noStroke();
+
+  textSize(20);
+
+
+  text(
+    EMOJI_TARGET +
+    " MEETING POINT",
+
+    destX,
+
+    verticalTop - 70
+  );
+
+
+  // --------------------------------------------------------------
+  // Tap instruction
+  // --------------------------------------------------------------
+
+  if (!autoPlay) {
+
+    fill(
+      red(C_DESTINATION),
+      green(C_DESTINATION),
+      blue(C_DESTINATION),
+
+      150 +
+      105 * pulse
+    );
+
+
+    textSize(14);
+
+
+    text(
+      EMOJI_TAP +
+      " TAP TO AUTO-DIVE",
+
+      destX - 5,
+
+      verticalTop - 45
+    );
+  }
+}
+
+
+// ================================================================
+// ACHILLES + TORTOISE
+// ================================================================
+
+void drawRacePositions() {
+
+  // --------------------------------------------------------------
+  // Achilles position
+  // --------------------------------------------------------------
+
+  float achillesX =
+    mapToScreen(
+      currentRem
+    );
+
+
+  // --------------------------------------------------------------
+  // Tortoise position
+  //
+  // Tortoise remains one Zeno step ahead.
+  // --------------------------------------------------------------
+
+  double tortoiseRem =
+    currentRem *
+    0.5;
+
+
+  float tortoiseX =
+    mapToScreen(
+      tortoiseRem
+    );
+
+
+  // ==============================================================
+  // TORTOISE TRACK
+  // ==============================================================
+
+  stroke(
+    red(C_TORTOISE),
+    green(C_TORTOISE),
+    blue(C_TORTOISE),
+    110
+  );
+
+
+  strokeWeight(3);
+
+
+  line(
+    lineLeft,
+    lineY + 55,
+
+    lineRight,
+    lineY + 55
+  );
+
+
+  // ==============================================================
+  // ACHILLES
+  // ==============================================================
+
+  if (
+    achillesX >= lineLeft &&
+    achillesX <= lineRight + 50
+  ) {
+
+    drawAchilles(
+      achillesX,
+      lineY - 65
+    );
+  }
+
+
+  // ==============================================================
+  // TORTOISE
+  // ==============================================================
+
+  if (
+    tortoiseX >= lineLeft &&
+    tortoiseX <= lineRight + 50
+  ) {
+
+    drawTortoise(
+      tortoiseX,
+      lineY + 55
+    );
+  }
+
+
+  // ==============================================================
+  // GAP INDICATOR
+  // ==============================================================
+
+  if (
+    tortoiseX >
+    achillesX
+  ) {
+
+    float gap =
+      tortoiseX -
+      achillesX;
+
+
+    if (gap > 4) {
+
+      stroke(C_REMAIN);
+
+      strokeWeight(2);
+
+
+      line(
+        achillesX,
+        lineY + 5,
+
+        tortoiseX,
+        lineY + 5
+      );
+
+
+      // ----------------------------------------------------------
+      // Gap label
+      // ----------------------------------------------------------
+
+      fill(C_REMAIN);
+
+      noStroke();
+
+      textSize(13);
+
+
+      text(
+        EMOJI_GAP +
+        " remaining chase gap",
+
+        (
+          achillesX +
+          tortoiseX
+        ) / 2,
+
+        lineY - 2
+      );
+    }
+  }
+}
+
+
+// ================================================================
+// ACHILLES DRAWING
+// ================================================================
+
+void drawAchilles(
+  float x,
+  float y
+) {
+
+  pushMatrix();
+
+  translate(x, y);
+
+
+  // ==============================================================
+  // VECTOR FALLBACK BODY
+  // ==============================================================
+
+  fill(C_ACHILLES);
+
+  noStroke();
+
+
+  ellipse(
+    0,
+    0,
+    38,
+    22
+  );
+
+
+  // --------------------------------------------------------------
+  // Head
+  // --------------------------------------------------------------
+
+  ellipse(
+    22,
+    -10,
+    18,
+    18
+  );
+
+
+  // --------------------------------------------------------------
+  // Legs
+  // --------------------------------------------------------------
+
+  stroke(C_ACHILLES);
+
+  strokeWeight(5);
+
+
+  line(
+    -10,
+    10,
+
+    -18,
+    25
+  );
+
+
+  line(
+    5,
+    10,
+
+    15,
+    25
+  );
+
+
+  // ==============================================================
+  // RUNNING DIRECTION
+  // ==============================================================
+
+  stroke(C_TEXT);
+
+  strokeWeight(3);
+
+
+  line(
+    32,
+    -25,
+
+    65,
+    -25
+  );
+
+
+  fill(C_TEXT);
+
+  noStroke();
+
+
+  triangle(
+    65,
+    -25,
+
+    52,
+    -32,
+
+    52,
+    -18
+  );
+
+
+  // ==============================================================
+  // EMOJI
+  // ==============================================================
+
+  textAlign(CENTER, CENTER);
+
+  textSize(42);
+
+  fill(C_TEXT);
+
+  text(
+    EMOJI_ACHILLES,
+
+    0,
+
+    -5
+  );
+
+
+  // ==============================================================
+  // LABEL
+  // ==============================================================
+
+  fill(C_ACHILLES);
+
+  textSize(15);
+
+
+  text(
+    EMOJI_ACHILLES +
+    " ACHILLES",
+
+    0,
+
+    -43
+  );
+
+
+  popMatrix();
+}
+
+
+// ================================================================
+// TORTOISE DRAWING
+// ================================================================
+
+void drawTortoise(
+  float x,
+  float y
+) {
+
+  pushMatrix();
+
+  translate(x, y);
+
+
+  // ==============================================================
+  // VECTOR FALLBACK SHELL
+  // ==============================================================
+
+  fill(C_TORTOISE);
+
+  noStroke();
+
+
+  ellipse(
+    0,
+    0,
+    48,
+    30
+  );
+
+
+  // --------------------------------------------------------------
+  // Head
+  // --------------------------------------------------------------
+
+  ellipse(
+    28,
+    -3,
+    18,
+    16
+  );
+
+
+  // --------------------------------------------------------------
+  // Legs
+  // --------------------------------------------------------------
+
+  stroke(C_TORTOISE);
+
+  strokeWeight(4);
+
+
+  line(
+    -15,
+    12,
+
+    -20,
+    22
+  );
+
+
+  line(
+    10,
+    12,
+
+    15,
+    22
+  );
+
+
+  // --------------------------------------------------------------
+  // Tail
+  // --------------------------------------------------------------
+
+  line(
+    -25,
+    0,
+
+    -35,
+    -5
+  );
+
+
+  // ==============================================================
+  // EMOJI
+  // ==============================================================
+
+  textAlign(CENTER, CENTER);
+
+  textSize(42);
+
+  fill(C_TEXT);
+
+
+  text(
+    EMOJI_TORTOISE,
+
+    0,
+
+    0
+  );
+
+
+  // ==============================================================
+  // LABEL
+  // ==============================================================
+
+  fill(C_TORTOISE);
+
+  textSize(15);
+
+
+  text(
+    EMOJI_TORTOISE +
+    " TORTOISE",
+
+    0,
+
+    42
+  );
+
+
+  popMatrix();
+}
+
+
+// ================================================================
+// FLASH
+// ================================================================
+
+void drawFlash() {
+
+  if (flashAlpha > 0) {
+
+    fill(
+      255,
+      255,
+      255,
+      flashAlpha
+    );
+
+
+    noStroke();
+
+
+    rect(
+      0,
+      0,
+
+      width,
+      height
+    );
+
+
+    flashAlpha *= 0.85;
+  }
+}
+
+
+// ================================================================
+// POSITION FORMAT
+// ================================================================
+
+String formatPosition(
+  double rem
+) {
+
+  if (
+    rem >= 0.000001 &&
+    rem <= 1.0
+  ) {
+
+    return nf(
+      (float)(
+        1.0 - rem
+      ),
+
+      1,
+
+      10
+    );
+
+  } else {
+
+    return
+      "1.0 - (" +
+      scientificOrDecimal(rem) +
+      ")";
+  }
+}
+
+
+// ================================================================
+// SCIENTIFIC FORMAT
+// ================================================================
+
+String scientificOrDecimal(
+  double value
+) {
+
+  if (value == 0.0) {
+
+    return "0";
+  }
+
+
+  double absValue =
+    Math.abs(value);
+
+
+  if (
+    absValue >= 0.000001 &&
+    absValue < 1000000.0
+  ) {
+
+    return nf(
+      (float)value,
+
+      1,
+
+      10
+    );
+  }
+
+
+  int exponent =
+    (int)Math.floor(
+      Math.log10(absValue)
+    );
+
+
+  double mantissa =
+    value /
+    Math.pow(
+      10.0,
+      exponent
+    );
+
+
+  return
+    nf(
+      (float)mantissa,
+
+      1,
+
+      6
+    ) +
+
+    " × 10^" +
+
+    exponent;
+}
+
+
+// ================================================================
+// FRACTION LABEL
+// ================================================================
+
+String fractionText(
+  int n
+) {
+
+  // --------------------------------------------------------------
+  // Exact integer fractions are safe through n = 60
+  // in a signed Java long.
+  // --------------------------------------------------------------
+
+  if (n <= 60) {
+
+    long denominator =
+      1L << n;
+
+
+    long numerator =
+      denominator - 1L;
+
+
+    return
+      numerator +
+      "/" +
+      denominator;
+  }
+
+
+  // --------------------------------------------------------------
+  // For deep stages avoid integer overflow.
+  // --------------------------------------------------------------
+
+  return
+    "1 - (1/2^" +
+    n +
+    ")";
+}
+
+
+// ================================================================
+// CONTROLS
+// ================================================================
+
+void drawControls() {
+
+  float btnY =
+    height * 0.82;
+
+
+  float btnH =
+    height * 0.12;
+
+
+  float gap =
+    width * 0.04;
+
+
+  float btnW =
+    width * 0.20;
+
+
+  float x1 =
+    gap;
+
+
+  float x2 =
+    x1 +
+    btnW +
+    gap;
+
+
+  float x3 =
+    x2 +
+    btnW +
+    gap;
+
+
+  float x4 =
+    x3 +
+    btnW +
+    gap;
+
+
+  rectMode(CORNER);
+
+
+  textSize(
+    min(
+      18,
+      width * 0.022
+    )
+  );
+
+
+  // ==============================================================
+  // RESET
+  // ==============================================================
+
+  fill(C_PANEL);
+
+  stroke(C_GRID);
+
+  strokeWeight(2);
+
+
+  rect(
+    x1,
+    btnY,
+
+    btnW,
+    btnH,
+
+    15
+  );
+
+
+  fill(C_TEXT);
+
+
+  text(
+    EMOJI_RESET +
+    " RESET",
+
+    x1 + btnW / 2,
+
+    btnY + btnH / 2
+  );
+
+
+  // ==============================================================
+  // PIERCE NEXT
+  // ==============================================================
+
+  fill(C_PANEL);
+
+  stroke(C_GRID);
+
+  strokeWeight(2);
+
+
+  rect(
+    x2,
+    btnY,
+
+    btnW,
+    btnH,
+
+    15
+  );
+
+
+  fill(C_STAGE);
+
+
+  text(
+    EMOJI_NEXT +
+    " PIERCE NEXT",
+
+    x2 + btnW / 2,
+
+    btnY + btnH / 2
+  );
+
+
+  // ==============================================================
+  // AUTO DIVE
+  // ==============================================================
+
+  fill(C_PANEL);
+
+
+  stroke(
+    autoPlay
+    ?
+    C_PASSED
+    :
+    C_GRID
+  );
+
+
+  strokeWeight(2);
+
+
+  rect(
+    x3,
+    btnY,
+
+    btnW,
+    btnH,
+
+    15
+  );
+
+
+  fill(
+    autoPlay
+    ?
+    C_PASSED
+    :
+    C_TEXT
+  );
+
+
+  text(
+    autoPlay
+    ?
+    EMOJI_STOP + " HALT DIVE"
+    :
+    EMOJI_PLAY + " AUTO DIVE",
+
+    x3 + btnW / 2,
+
+    btnY + btnH / 2
+  );
+
+
+  // ==============================================================
+  // CAMERA
+  // ==============================================================
+
+  fill(C_PANEL);
+
+
+  stroke(
+    deepZoomMode
+    ?
+    C_REMAIN
+    :
+    C_GRID
+  );
+
+
+  strokeWeight(2);
+
+
+  rect(
+    x4,
+    btnY,
+
+    btnW,
+    btnH,
+
+    15
+  );
+
+
+  fill(
+    deepZoomMode
+    ?
+    C_REMAIN
+    :
+    C_TEXT
+  );
+
+
+  text(
+    deepZoomMode
+    ?
+    EMOJI_DYNAMIC + " DYNAMIC"
+    :
+    EMOJI_STATIC + " STATIC",
+
+    x4 + btnW / 2,
+
+    btnY + btnH / 2
+  );
+}
+
+
+// ================================================================
+// TOUCH CONTROL
+// ================================================================
+
+void mousePressed() {
+
+  // ==============================================================
+  // MEETING POINT TAP
+  // ==============================================================
+
+  if (
+    mouseX >
+    lineRight - 150 &&
+
+    mouseY >
+    height * 0.25 &&
+
+    mouseY <
+    height * 0.75
+  ) {
+
+    if (!autoPlay) {
+
+      autoPlay = true;
+
+      deepZoomMode = true;
+
+    } else {
+
+      autoPlay = false;
+    }
+
+
+    return;
+  }
+
+
+  // ==============================================================
+  // BUTTON GEOMETRY
+  // ==============================================================
+
+  float btnY =
+    height * 0.82;
+
+
+  float btnH =
+    height * 0.12;
+
+
+  float gap =
+    width * 0.04;
+
+
+  float btnW =
+    width * 0.20;
+
+
+  float x1 =
+    gap;
+
+
+  float x2 =
+    x1 +
+    btnW +
+    gap;
+
+
+  float x3 =
+    x2 +
+    btnW +
+    gap;
+
+
+  float x4 =
+    x3 +
+    btnW +
+    gap;
+
+
+  // ==============================================================
+  // BUTTON AREA
+  // ==============================================================
+
+  if (
+    mouseY > btnY &&
+    mouseY < btnY + btnH
+  ) {
+
+
+    // ============================================================
+    // RESET
+    // ============================================================
+
+    if (
+      mouseX > x1 &&
+      mouseX < x1 + btnW
+    ) {
+
+      reset();
+
+      return;
+    }
+
+
+    // ============================================================
+    // PIERCE NEXT
+    // ============================================================
+
+    if (
+      mouseX > x2 &&
+      mouseX < x2 + btnW
+    ) {
+
+      autoPlay = false;
+
+      startNextStep();
+
+      return;
+    }
+
+
+    // ============================================================
+    // AUTO DIVE
+    // ============================================================
+
+    if (
+      mouseX > x3 &&
+      mouseX < x3 + btnW
+    ) {
+
+      autoPlay =
+        !autoPlay;
+
+
+      if (autoPlay) {
+
+        deepZoomMode = true;
+      }
+
+
+      return;
+    }
+
+
+    // ============================================================
+    // CAMERA
+    // ============================================================
+
+    if (
+      mouseX > x4 &&
+      mouseX < x4 + btnW
+    ) {
+
+      deepZoomMode =
+        !deepZoomMode;
+
+      return;
+    }
+  }
+
+
+  // ==============================================================
+  // ANYWHERE ELSE = NEXT ZENO STEP
+  // ==============================================================
+
+  autoPlay = false;
+
+  startNextStep();
+}
